@@ -99,7 +99,7 @@ dqn_solver = DQNSolver(observation_space, env.action_space.n)
 
 episode = 0
 score = []
-for i in range(200):
+for i in range(50):
     state = env.reset()
     state = np.reshape(state, [1, observation_space])
 
