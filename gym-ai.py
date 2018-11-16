@@ -2,16 +2,20 @@
 from keras.models import Sequential
 from keras.layers import Dense
 from keras.optimizers import Adam
-
+from keras.models import load_model
+import matplotlib.pyplot as plt
+import os
 import random
-
 import numpy as np
 # fix random seed for reproducibility
 np.random.seed(7)
 
 import gym
-env = gym.make('CartPole-v0')
 
+ENVIRONMENT = 'CartPole-v0'
+SAVED_MODEL_FILE = ENVIRONMENT + "-model.h5"
+
+env = gym.make(ENVIRONMENT)
 
 # https://becominghuman.ai/lets-build-an-atari-ai-part-1-dqn-df57e8ff3b26
 # Well, there are two ways to approach this. One is to pass the action in as an input, and the other is to have one output per action (which is possible because we have relatively few actions). The latter option is much faster, as clearly explained by the DeepMind paper:
@@ -19,27 +23,44 @@ env = gym.make('CartPole-v0')
 # https://towardsdatascience.com/cartpole-introduction-to-reinforcement-learning-ed0eb5b58288
 
 ALPHA = 0.9
+ALPHA_INVERSE = (1 - ALPHA)
+
 LEARNING_RATE = 0.001
+
+EXPLORATION_RATE_INIT = 1.0
+EXPLORATION_RATE_MIN = 0.01
+EXPLORATION_RATE_DECAY = 0.95
 
 DISCOUNT_FACTOR = 0.8
 BATCH_SIZE = 20
 
 class DQNSolver():
   def __init__(self, observation_space_size, action_space_size):
-    self.model = Sequential()
-    self.model.add(Dense(24, input_dim=observation_space_size, activation='relu'))
-    self.model.add(Dense(24, activation="relu"))
-    self.model.add(Dense(action_space_size, activation='linear'))
-    self.model.compile(loss="mean_squared_error", optimizer=Adam(lr=LEARNING_RATE))
+    if os.path.isfile(SAVED_MODEL_FILE):
+      print("Using saved model: ", SAVED_MODEL_FILE)
+      self.model = load_model(SAVED_MODEL_FILE)
+    else:
+      self.model = Sequential()
+      self.model.add(Dense(24, input_dim=observation_space_size, activation='relu'))
+      self.model.add(Dense(24, activation="relu"))
+      self.model.add(Dense(action_space_size, activation='linear'))
+      self.model.compile(loss="mean_squared_error", optimizer=Adam(lr=LEARNING_RATE))
+    
     self.memory = []
+    self.action_space = action_space_size
+    self.exploration_rate = 1
+
+  def save(self):
+    self.model.save(SAVED_MODEL_FILE)
 
   def get_action(self, state):
-    candidate_actions = self.model.predict(state).flatten()
+    # We need to also explore the action space in order to build the Q network
+    if random.random() < self.exploration_rate:
+      return random.randrange(0, self.action_space)
+    
+    candidate_actions = self.model.predict(state)
 
-    # Since our model outputs 0-1 (sigmoid) for every action, we can treat them as a probability
-    for i in range(len(candidate_actions)):
-      if candidate_actions[i] > random.random():
-        return i
+    return np.argmax(candidate_actions[0])
 
   def remember(self, state, action, reward, state_next, done):
     self.memory.append((state, action, reward, state_next, done))
@@ -56,25 +77,40 @@ class DQNSolver():
     for state, action, reward, state_next, done in batch:
       # Q(s, a)_t
       Q_s = self.model.predict(state)
-      Q_sa = Q_s[action]
+      Q_sa = Q_s[0][action]
 
       Q_prime_s = self.model.predict(state_next)
 
-      Q_sa_next = Q_sa + ALPHA * (reward + DISCOUNT_FACTOR * Q_prime_s[np.argmax(Q_prime_s)])
+      Q_sa_next = ALPHA_INVERSE * Q_sa + ALPHA * (reward + DISCOUNT_FACTOR * Q_prime_s[0][np.argmax(Q_prime_s)])
 
       # When done, we don't use the formula above but we just use the final reward
       if done:
         Q_sa_next = reward
 
-      self.model.fit(state, Q_sa_next)
+      
+      Q_s[0][action] = Q_sa_next
+      self.model.fit(state, Q_s, verbose=0)
+
+      if self.exploration_rate > EXPLORATION_RATE_MIN:
+        self.exploration_rate *= EXPLORATION_RATE_DECAY
 
 observation_space = env.observation_space.shape[0]
 dqn_solver = DQNSolver(observation_space, env.action_space.n)
 
-while True:
+episode = 0
+score = []
+for i in range(200):
     state = env.reset()
     state = np.reshape(state, [1, observation_space])
-      
+
+
+    if episode % 10 == 0:
+      dqn_solver.save()
+
+    print("Episode ", episode)
+    episode += 1
+
+    step = 0
     while True:
       env.render()
 
@@ -82,26 +118,19 @@ while True:
       state_next, reward, done, info = env.step(action)
       state_next = np.reshape(state_next, [1, observation_space])
 
-      reward if not done else -reward
+      reward if not done else -reward # Wut? Why use -reward?
 
 
       dqn_solver.remember(state, action, reward, state_next, done)
       dqn_solver.experience_replay()
       
       state = state_next
-      
+      step += 1
+
       if done:
+        score.append(step)
         break
     
-    # Backprop
-    model.fit()
-
-    prevObservation = observation
-
-
-    # Input = observation
-    # Output = reward per action
-
-
-    backwards_pass()
-    input()
+plt.plot(score)
+plt.xticks(list(range(len(score))))
+plt.show()
