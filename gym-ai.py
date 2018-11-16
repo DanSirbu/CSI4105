@@ -14,8 +14,12 @@ np.random.seed(7)
 import gym
 
 #ENVIRONMENT = 'CartPole-v0'
-ENVIRONMENT = 'LunarLander-v2'
-#ENVIRONMENT = 'Pong-v0'
+#ENVIRONMENT = 'LunarLander-v2'
+#ENVIRONMENT = 'Acrobot-v1'
+#ENVIRONMENT = 'MountainCar-v0'
+ENVIRONMENT = 'MsPacman-ram-v0'
+
+
 SAVED_MODEL_FILE = ENVIRONMENT + "-model.h5"
 STATE_FILE = ENVIRONMENT + "-state.save"
 
@@ -26,6 +30,8 @@ env = gym.make(ENVIRONMENT)
 
 # https://towardsdatascience.com/cartpole-introduction-to-reinforcement-learning-ed0eb5b58288
 
+
+#Hyperparameters
 ALPHA = 0.9
 ALPHA_INVERSE = (1 - ALPHA)
 
@@ -59,6 +65,7 @@ class DQNSolver():
   def save(self):
     self.model.save(SAVED_MODEL_FILE)
 
+  #Returns the next action to take
   def get_action(self, state):
     # We need to also explore the action space in order to build the Q network
     if random.random() < self.exploration_rate:
@@ -68,24 +75,25 @@ class DQNSolver():
 
     return np.argmax(candidate_actions[0])
 
+  #Store state,next state pairs for training
   def remember(self, state, action, reward, state_next, done):
     self.memory.append((state, action, reward, state_next, done))
 
   # Experience replay is needed because it makes the target more stable
   # i.e. as we are learning, our "correct" label changes, so we train on a batch to mitigate the changes
   def experience_replay(self):
-    if len(self.memory) < BATCH_SIZE:
+    if len(self.memory) < BATCH_SIZE:   #don't q learn before batch_size number of examples
       return
   
     batch = random.sample(self.memory, BATCH_SIZE)
 
-    # Q(s, a)_t+1 = Q(s, a)_t + a * (R(s, a) + Y * maxQ(s', a')) 
+    # Q(s, a)_t+1 = (1-a)*Q(s, a)_t + a * (R(s, a) + Y * maxQ(s', a'))
     for state, action, reward, state_next, done in batch:
       # Q(s, a)_t
       Q_s = self.model.predict(state)
-      Q_sa = Q_s[0][action]
+      Q_sa = Q_s[0][action]       #Q_sa reward of the action taken
 
-      Q_prime_s = self.model.predict(state_next)
+      Q_prime_s = self.model.predict(state_next)    #reward of next state actions
 
       Q_sa_next = ALPHA_INVERSE * Q_sa + ALPHA * (reward + DISCOUNT_FACTOR * Q_prime_s[0][np.argmax(Q_prime_s)])
 
@@ -100,6 +108,7 @@ class DQNSolver():
     if self.exploration_rate > EXPLORATION_RATE_MIN:
       self.exploration_rate *= EXPLORATION_RATE_DECAY
 
+#bookkeeping: plot scores
 def plotScore():
     plt.plot(score)
     plt.xticks(list(range(len(score))))
@@ -121,15 +130,18 @@ if os.path.isfile(STATE_FILE):
     if PLOT_SCORE_ON_LOAD:
       plotScore()
 
+#loop 50 episodes (small reasonable number)
 for i in range(50):
+    #initializing environment
     state = env.reset()
     state = np.reshape(state, [1, observation_space])
 
     print("Episode ", episode)
     episode += 1
 
-    step = 0
-    game_reward = 0
+    #Loop to be ran every frame(game), will loop till game end
+    step = 0    # number of frames taken for game to end
+    game_reward = 0   #cumulutive reward total for scorekeeping
     while True:
       env.render()
 
@@ -154,7 +166,7 @@ for i in range(50):
 
     # Post game
     if episode % 10 == 0:
-      dqn_solver.save()
+      dqn_solver.save()   #save model every 10 episodes
       with open(STATE_FILE, 'wb') as f:
         pickle.dump([dqn_solver.exploration_rate, score], f)
     
