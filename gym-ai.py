@@ -3,6 +3,7 @@ from keras.models import Sequential
 from keras.layers import Dense
 from keras.optimizers import Adam
 from keras.models import load_model
+import pickle
 import matplotlib.pyplot as plt
 import os
 import random
@@ -14,6 +15,7 @@ import gym
 
 ENVIRONMENT = 'CartPole-v0'
 SAVED_MODEL_FILE = ENVIRONMENT + "-model.h5"
+STATE_FILE = ENVIRONMENT + "-state.save"
 
 env = gym.make(ENVIRONMENT)
 
@@ -31,8 +33,10 @@ EXPLORATION_RATE_INIT = 1.0
 EXPLORATION_RATE_MIN = 0.01
 EXPLORATION_RATE_DECAY = 0.95
 
-DISCOUNT_FACTOR = 0.8
+DISCOUNT_FACTOR = 0.95
 BATCH_SIZE = 20
+
+PLOT_SCORE_ON_LOAD = False
 
 class DQNSolver():
   def __init__(self, observation_space_size, action_space_size):
@@ -48,7 +52,7 @@ class DQNSolver():
     
     self.memory = []
     self.action_space = action_space_size
-    self.exploration_rate = 1
+    self.exploration_rate = EXPLORATION_RATE_INIT
 
   def save(self):
     self.model.save(SAVED_MODEL_FILE)
@@ -94,11 +98,27 @@ class DQNSolver():
       if self.exploration_rate > EXPLORATION_RATE_MIN:
         self.exploration_rate *= EXPLORATION_RATE_DECAY
 
+def plotScore():
+    plt.plot(score)
+    plt.xticks(list(range(len(score))))
+    plt.show()
+
 observation_space = env.observation_space.shape[0]
 dqn_solver = DQNSolver(observation_space, env.action_space.n)
 
 episode = 0
 score = []
+
+if os.path.isfile(STATE_FILE):
+  with open(STATE_FILE, 'rb') as f:
+    loadedData = pickle.load(f)
+
+    dqn_solver.exploration_rate = loadedData[0]
+    score = loadedData[-1]
+    episode = len(score)
+    if PLOT_SCORE_ON_LOAD:
+      plotScore()
+
 for i in range(50):
     state = env.reset()
     state = np.reshape(state, [1, observation_space])
@@ -106,6 +126,8 @@ for i in range(50):
 
     if episode % 10 == 0:
       dqn_solver.save()
+      with open(STATE_FILE, 'wb') as f:
+        pickle.dump([dqn_solver.exploration_rate, score], f)
 
     print("Episode ", episode)
     episode += 1
@@ -118,7 +140,7 @@ for i in range(50):
       state_next, reward, done, info = env.step(action)
       state_next = np.reshape(state_next, [1, observation_space])
 
-      reward if not done else -reward # Wut? Why use -reward?
+      #reward if not done else -reward # Wut? Why use -reward?
 
 
       dqn_solver.remember(state, action, reward, state_next, done)
@@ -131,6 +153,4 @@ for i in range(50):
         score.append(step)
         break
     
-plt.plot(score)
-plt.xticks(list(range(len(score))))
-plt.show()
+plotScore()
