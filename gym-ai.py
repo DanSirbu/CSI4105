@@ -13,7 +13,9 @@ np.random.seed(7)
 
 import gym
 
-ENVIRONMENT = 'CartPole-v0'
+#ENVIRONMENT = 'CartPole-v0'
+ENVIRONMENT = 'LunarLander-v2'
+#ENVIRONMENT = 'Pong-v0'
 SAVED_MODEL_FILE = ENVIRONMENT + "-model.h5"
 STATE_FILE = ENVIRONMENT + "-state.save"
 
@@ -95,8 +97,8 @@ class DQNSolver():
       Q_s[0][action] = Q_sa_next
       self.model.fit(state, Q_s, verbose=0)
 
-      if self.exploration_rate > EXPLORATION_RATE_MIN:
-        self.exploration_rate *= EXPLORATION_RATE_DECAY
+    if self.exploration_rate > EXPLORATION_RATE_MIN:
+      self.exploration_rate *= EXPLORATION_RATE_DECAY
 
 def plotScore():
     plt.plot(score)
@@ -123,16 +125,11 @@ for i in range(50):
     state = env.reset()
     state = np.reshape(state, [1, observation_space])
 
-
-    if episode % 10 == 0:
-      dqn_solver.save()
-      with open(STATE_FILE, 'wb') as f:
-        pickle.dump([dqn_solver.exploration_rate, score], f)
-
     print("Episode ", episode)
     episode += 1
 
     step = 0
+    game_reward = 0
     while True:
       env.render()
 
@@ -148,9 +145,17 @@ for i in range(50):
       
       state = state_next
       step += 1
+      game_reward += reward
 
       if done:
-        score.append(step)
+        score.append(game_reward / step)
+        print("Game score: ", score[-1])
         break
+
+    # Post game
+    if episode % 10 == 0:
+      dqn_solver.save()
+      with open(STATE_FILE, 'wb') as f:
+        pickle.dump([dqn_solver.exploration_rate, score], f)
     
 plotScore()
