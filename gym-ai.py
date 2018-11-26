@@ -13,11 +13,9 @@ np.random.seed(7)
 
 import gym
 
-#ENVIRONMENT = 'CartPole-v0'
+ENVIRONMENT = 'CartPole-v0'
 #ENVIRONMENT = 'LunarLander-v2'
-#ENVIRONMENT = 'Acrobot-v1'
 #ENVIRONMENT = 'MountainCar-v0'
-ENVIRONMENT = 'MsPacman-ram-v0'
 
 
 SAVED_MODEL_FILE = ENVIRONMENT + "-model.h5"
@@ -44,7 +42,7 @@ EXPLORATION_RATE_DECAY = 0.95
 DISCOUNT_FACTOR = 0.95
 BATCH_SIZE = 20
 
-PLOT_SCORE_ON_LOAD = False
+PLOT_SCORE_ON_LOAD = True
 
 class DQNSolver():
   def __init__(self, observation_space_size, action_space_size):
@@ -111,7 +109,7 @@ class DQNSolver():
 #bookkeeping: plot scores
 def plotScore():
     plt.plot(score)
-    plt.xticks(list(range(len(score))))
+    #plt.xticks(list(range(len(score))))
     plt.show()
 
 observation_space = env.observation_space.shape[0]
@@ -131,13 +129,14 @@ if os.path.isfile(STATE_FILE):
       plotScore()
 
 #loop 50 episodes (small reasonable number)
-for i in range(50):
+for i in range(100):
     #initializing environment
     state = env.reset()
     state = np.reshape(state, [1, observation_space])
 
     print("Episode ", episode)
     episode += 1
+
 
     #Loop to be ran every frame(game), will loop till game end
     step = 0    # number of frames taken for game to end
@@ -149,7 +148,7 @@ for i in range(50):
       state_next, reward, done, info = env.step(action)
       state_next = np.reshape(state_next, [1, observation_space])
 
-      #reward if not done else -reward # Wut? Why use -reward?
+      reward if not done else -reward
 
 
       dqn_solver.remember(state, action, reward, state_next, done)
@@ -160,7 +159,8 @@ for i in range(50):
       game_reward += reward
 
       if done:
-        score.append(game_reward / step)
+        #score.append(game_reward / step)
+        score.append(game_reward)
         print("Game score: ", score[-1])
         break
 
